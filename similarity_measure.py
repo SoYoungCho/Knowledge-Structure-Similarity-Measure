@@ -18,8 +18,8 @@ import re
 import ast
 from typing import Tuple
 
-ALPHA = 0.5
-BETA = 0.5
+NODE_SIMILARITY_WEIGHT = 0.5  # 원래 ALPHA 였는데, 코드에서는 이해가 잘가도록 명확한 것이 좋음.
+RELATION_SIMILARITY_WEIGHT = 0.5
 
 
 # base_path = "C:/Users/kirc/Desktop/Soyoung/KIRC/지식구조 프로그램/knowledge_structure_kirc-master/results/result_webgraph/data/"
@@ -50,7 +50,7 @@ def parse_js_file(base_path, file_name: str) -> Tuple[list, list]:
 
     nodes, edges = data[0], data[2]
 
-    nodes = _parse_dict_from_js(nodes) # 원래는 nodes_list였는데, 변수명은 비슷한 건 통일해주는 것이 좋다고 함.
+    nodes = _parse_dict_from_js(nodes)  # 원래는 nodes_list였는데, 변수명은 비슷한 건 통일해주는 것이 좋다고 함.
     edges = _parse_dict_from_js(edges)
 
     return nodes, edges
@@ -60,7 +60,7 @@ def get_unique_node(nodes: list):  # 유니크 값들 추출. 함수명은 변�
     # 딕셔너리 형태만 자주 사용하지 않기에 예외. .set도 마찬가지.
     node_set = set()
 
-    for node_dict in nodes: # 딕셔너리도 dic말고 dict로 .
+    for node_dict in nodes:  # 딕셔너리도 dic말고 dict로 .
         node_set.add(node_dict['label'])
 
     return node_set
@@ -83,7 +83,7 @@ def create_score_list(edges: list, id2word: dict) -> list:  # Score List 생성
     scores = list()
     # 여기처럼 변수 선언하고 for 문 전에 한칸 띄기. 함수 선언하며 변수를 다 선언하고 시작. 선언부, 로직부 나누어져 있으면 보기 편함
     for edge_dict in edges:
-        node1 = edge_dict['from'] #n1, n2였던걸 node1 node2로 바꿈. node_1처럼 숫자에 언더바 붙이는 것은 보기 흉함
+        node1 = edge_dict['from']  # n1, n2였던걸 node1 node2로 바꿈. node_1처럼 숫자에 언더바 붙이는 것은 보기 흉함
         node2 = edge_dict['to']
         # 여기 띄어쓰기함!
         score = edge_dict['label']
@@ -92,11 +92,13 @@ def create_score_list(edges: list, id2word: dict) -> list:  # Score List 생성
     return scores
 
 
-def get_jaccard_similarity(union_node, intersection_node): # jaccard_similarity_score가 기존 함수명이였음. 이것도 변수명같으니 고쳐주고, score 가 없어도 직관적이니 뺌.
+def get_jaccard_similarity(union_node,
+                           intersection_node):  # jaccard_similarity_score가 기존 함수명이였음. 이것도 변수명같으니 고쳐주고, score 가 없어도 직관적이니 뺌.
     return round(len(intersection_node) / len(union_node), 5)
 
 
-def get_average_score(scores1, scores2: list): # get_avg_score 였는데, 그냥 풀어서 씀. 이건 사람 스타일 문제. 구글은 줄여서 쓰고 애플은 풀어서 씀. 정답이 없음.
+def get_average_score(scores1,
+                      scores2: list):  # get_avg_score 였는데, 그냥 풀어서 씀. 이건 사람 스타일 문제. 구글은 줄여서 쓰고 애플은 풀어서 씀. 정답이 없음.
     score_sum = 0
     count = 0
 
@@ -105,118 +107,139 @@ def get_average_score(scores1, scores2: list): # get_avg_score 였는데, 그냥
             # if (s1[0] == s2[0] and s1[1] == s2[1]) \
             #         or (s1[0] == s2[1] and s1[1] == s2[0]):
             if set(s1) == set(s2):
-                print("겹치는 쌍 : ", s1, s2)
+                # print("겹치는 쌍 : ", s1, s2)
                 score_diff = abs(float(s1[2]) - float(s2[2]))
 
                 count += 1
                 score_sum += score_diff
 
-    if count == 0:
-        return 0
+    if not count:  # count == 0 보다 이게 더 좋음
+        average_score = 0  # return 0 이렇게 리턴을 두 번하기 보다 하나의 변수로 받아서 한번에 리턴하는 것이 더 깔끔. 변수명도 함수명과 일치하니 깔끔
     else:
         avg_score = score_sum / count
-        return 1 - round(avg_score, 3)
+        average_score = 1 - round(avg_score, 3)
+
+    return average_score
 
 
 def get_ks_similarity(base_path, ks1, ks2):  # main 함수
+    """
+    ks는 knowledge structure. 변수를 줄여 쓰면 이렇게 꼭 설명하는게 좋음.
+    """
     nodes1, edges1 = parse_js_file(base_path, ks1)
     nodes2, edges2 = parse_js_file(base_path, ks2)
 
-    node1_set = get_unique_node(nodes1)
-    node2_set = get_unique_node(nodes2)
+    node_set1 = get_unique_node(nodes1)  # node1_set 이거보다 숫자는 뒤에 붙는 것이 깔끔
+    node_set2 = get_unique_node(nodes2)  # get node set 이렇게 함수명으로 해도 괜찮다.
 
-    union_node = node1_set.union(node2_set)
+    union_node = node_set1.union(node_set2)
+    intersection_node = node_set1.intersection(node_set2)  # 공통 노드 키워드 구하기
 
-    id2word1 = convert_id_to_word(nodes1)
+    id2word1 = convert_id_to_word(nodes1)  # 이렇게 나눈거 잘했어여.
     id2word2 = convert_id_to_word(nodes2)
 
     scores1 = create_score_list(edges1, id2word1)
     scores2 = create_score_list(edges2, id2word2)
 
-    intersection_node = node1_set.intersection(node2_set)  # 공통 노드 키워드 구하기
+    relation_similarity = get_average_score(scores1,
+                                            scores2)  # sim이라고 하는 것보다 풀어쓴느게 조음. 통일해서 쓰는게 좋다. 줄일거면 다 줄이고 아니면 다 풀고. 무엇이든 통일되게.
+    # print("relation_similarity : ", relation_similarity)
+    node_similarity = get_jaccard_similarity(union_node, intersection_node)
+    # print("node_similarity : ", node_similarity)
 
-    relation_sim = get_average_score(scores1, scores2)
-    # print("relation_sim : ", relation_sim)
-    node_sim = get_jaccard_similarity(union_node, intersection_node)
-    # print("node_sim : ", node_sim)
-
-    arithmetic_score = ALPHA * relation_sim + BETA * node_sim
-    return arithmetic_score
-
-
-def get_file_pair_list(index_list: list):  # nC2 구하는 함수
-    file_pair_list = list()
-
-    for i in range(len(index_list) - 1):
-        for j in range(i + 1, len(index_list)):
-            if i == j:
-                continue
-            else:
-                file_pair_list.append([index_list[i], index_list[j]])
-
-    return file_pair_list
+    ks_similarity = RELATION_SIMILARITY_WEIGHT * relation_similarity + NODE_SIMILARITY_WEIGHT * node_similarity  # 굳이 칠 필요 없으면 안 쳐도 됨. 이정도는 괜찮. 헷갈리지 않거나 동작이 문제 없다면 괄호 안치는 것 추천.
+    return ks_similarity  # 원래는 arithmetic_score 이었는데, 함수명과 일치시키기 위해 변수를 이렇게.
 
 
-def get_nxn_file_list(index_A, index_B):  # n*n 구하는 함수
-    nxn_file_list = list()
+def get_combinations(indices1, indices2=None):
+    combinations = list()
 
-    for num_A in index_A:
-        for num_B in index_B:
-            nxn_file_list.append([num_A, num_B])
+    if indices2 is None:
+        for i in range(len(indices1) - 1):
+            for j in range(i + 1, len(indices1)):
+                if i != j:
+                    combinations.append([indices1[i], indices1[j]])
+    else:
+        for index1 in indices1:
+            for index2 in indices2:
+                combinations.append([index1, index2])
 
-    return nxn_file_list
+    return combinations
 
 
-def intra_sim(base_path, keyword, index_list):
+# def get_intra_combinations(index_list: list):  # nC2 구하는 함수
+#     combinations = list()
+#
+#     for i in range(len(index_list) - 1):
+#         for j in range(i + 1, len(index_list)):
+#             if i == j: # 이거를 !=로 바꾸면, 아래 continue와 else를 뺄 수 있음.
+#                 continue
+#             else:
+#                 combinations.append([index_list[i], index_list[j]])
+#
+#     return combinations
+#
+#
+# def get_inter_combinations(index_A, index_B):  # n*n 구하는 함수
+#     nxn_file_list = list()
+#
+#     for num_A in index_A:
+#         for num_B in index_B:
+#             nxn_file_list.append([num_A, num_B])
+#
+#     return nxn_file_list
+
+
+def get_intra_similarity(base_path, keyword, indices):
+    similarity_sum = 0
+    scores = list()
+
+    if not indices:  # index list 비어있는 경우. 즉 선택한 기사가 없는 경우
+        intra_similarity = 0.0
+
+    else:
+        combinations = get_combinations(indices)
+
+        for combination in combinations:
+            ks_similarity = get_ks_similarity(base_path, f"{keyword}_{str(combination[0])}",
+                                              f"{keyword}_{str(combination[1])}")
+            similarity_score = round(ks_similarity, 3)
+
+            scores.append([combination[0], combination[1], similarity_score])
+            similarity_sum += similarity_score
+
+        if len(combinations) == 0:
+            intra_similarity = 0
+        else:
+            intra_similarity = round(similarity_sum / len(combinations), 3)
+
+    return scores, intra_similarity
+
+
+def get_inter_similarity(base_path, keyword1, keyword2, indices1, indices2):
     similarity_sum = 0
     score_list = list()
 
-    if not index_list:  # index list 비어있는 경우. 즉 선택한 기사가 없는 경우
-
-        return score_list, 0.0
-
-    else:
-        file_pair_list = get_file_pair_list(index_list)
-
-        for pair in file_pair_list:
-            ks_similarity = get_ks_similarity(base_path, keyword + '_' + str(pair[0]), keyword + '_' + str(pair[1]))
-            similarity_score = round(ks_similarity, 3)
-
-            score_list.append([pair[0], pair[1], similarity_score])
-            similarity_sum += similarity_score
-
-        if len(file_pair_list) == 0:
-            intra_avg_score = 0
-        else:
-            intra_avg_score = round(similarity_sum / len(file_pair_list), 3)
-
-        return score_list, intra_avg_score
-
-
-def inter_sim(base_path, keyword_A, keyword_B, index_A, index_B):
-    similarity_sum = 0
-    score_list = list()
-
-    if not index_A or not index_B:  # index list 비어있는 경우. 즉 선택한 기사가 없는 경우
-
-        return score_list, 0.0
+    if not indices1 or not indices2:  # index list 비어있는 경우. 즉 선택한 기사가 없는 경우
+        inter_similarity = 0.0
 
     else:
-        file_nxn_pair_list = get_nxn_file_list(index_A, index_B)
+        combinations = get_combinations(indices1, indices2)
 
-        for pair in file_nxn_pair_list:
-            ks_similarity = get_ks_similarity(base_path, keyword_A + '_' + str(pair[0]), keyword_B + '_' + str(pair[1]))
+        for combination in combinations:
+            ks_similarity = get_ks_similarity(base_path, keyword1 + '_' + str(combination[0]),
+                                              keyword2 + '_' + str(combination[1]))
             similarity_score = round(ks_similarity, 3)
 
-            score_list.append([pair[0], pair[1], similarity_score])
+            score_list.append([combination[0], combination[1], similarity_score])
             similarity_sum += similarity_score
 
-        if len(file_nxn_pair_list) == 0:
-            inter_avg_score = 0
+        if len(combinations) == 0:
+            inter_similarity = 0
         else:
-            inter_avg_score = round(similarity_sum / len(file_nxn_pair_list), 3)
+            inter_similarity = round(similarity_sum / len(combinations), 3)
 
-        return score_list, inter_avg_score
+    return score_list, inter_similarity
 
 
 '''
@@ -238,9 +261,9 @@ output:
 '''
 
 
-def similarity_measure(base_path, keyword_A, index_A, keyword_B, index_B):
-    A_list, A_avg = intra_sim(base_path, keyword_A, index_A)
-    B_list, B_avg = intra_sim(base_path, keyword_B, index_B)
-    AB_list, AB_avg = inter_sim(base_path, keyword_A, keyword_B, index_A, index_B)
+def similarity_measure(base_path, keyword1, indices1, keyword2, indices2):
+    result1, average_score1 = intra_sim(base_path, keyword1, indices1)
+    result2, average_score2 = intra_sim(base_path, keyword2, indices2)
+    result_12, average_score12 = inter_sim(base_path, keyword1, keyword2, indices1, indices2)
 
-    return A_list, B_list, AB_list, A_avg, B_avg, AB_avg
+    return result1, result2, result_12, average_score1, average_score2, average_score12
