@@ -104,9 +104,7 @@ def get_average_score(scores1,
 
     for s1 in scores1:  # A에 쌍이 있는지 확인
         for s2 in scores2:  # 해당 A의 쌍이 B에도 있는지 확인
-            # if (s1[0] == s2[0] and s1[1] == s2[1]) \
-            #         or (s1[0] == s2[1] and s1[1] == s2[0]):
-            if set(s1) == set(s2):
+            if set([s1[0], s1[1]]) == set([s2[0], s2[1]]):
                 # print("겹치는 쌍 : ", s1, s2)
                 score_diff = abs(float(s1[2]) - float(s2[2]))
 
@@ -190,7 +188,9 @@ def get_combinations(indices1, indices2=None):
 #     return nxn_file_list
 
 
-def get_intra_similarity(base_path, keyword, indices):
+def get_intra_similarity(base_path, keyword, indices): # 이렇게 안하고 여기에 get_similarity 함수 하나를 새로 정의하고, method라는 파라미터로 intra, inter, ks, jaccard 이런 식으로 넘겨서
+    # 만든 함수들을 호출하도록 해도 좋다.
+    # 그리고 함수명 앞에 언더바를 붙이는 경우는 해당 함수들이 해당 파일 안에서만 쓰이는 경우. 여기는 마지막 함수 빼고 다 해주어야 할듯.
     similarity_sum = 0
     scores = list()
 
@@ -208,17 +208,14 @@ def get_intra_similarity(base_path, keyword, indices):
             scores.append([combination[0], combination[1], similarity_score])
             similarity_sum += similarity_score
 
-        if len(combinations) == 0:
-            intra_similarity = 0
-        else:
-            intra_similarity = round(similarity_sum / len(combinations), 3)
+        intra_similarity = round(similarity_sum / len(combinations), 3)
 
-    return scores, intra_similarity
+    return intra_similarity, scores
 
 
 def get_inter_similarity(base_path, keyword1, keyword2, indices1, indices2):
     similarity_sum = 0
-    score_list = list()
+    scores = list()
 
     if not indices1 or not indices2:  # index list 비어있는 경우. 즉 선택한 기사가 없는 경우
         inter_similarity = 0.0
@@ -231,15 +228,12 @@ def get_inter_similarity(base_path, keyword1, keyword2, indices1, indices2):
                                               keyword2 + '_' + str(combination[1]))
             similarity_score = round(ks_similarity, 3)
 
-            score_list.append([combination[0], combination[1], similarity_score])
+            scores.append([combination[0], combination[1], similarity_score])
             similarity_sum += similarity_score
 
-        if len(combinations) == 0:
-            inter_similarity = 0
-        else:
-            inter_similarity = round(similarity_sum / len(combinations), 3)
+        inter_similarity = round(similarity_sum / len(combinations), 3)
 
-    return score_list, inter_similarity
+    return inter_similarity, scores
 
 
 '''
@@ -261,9 +255,9 @@ output:
 '''
 
 
-def similarity_measure(base_path, keyword1, indices1, keyword2, indices2):
-    result1, average_score1 = intra_sim(base_path, keyword1, indices1)
-    result2, average_score2 = intra_sim(base_path, keyword2, indices2)
-    result_12, average_score12 = inter_sim(base_path, keyword1, keyword2, indices1, indices2)
+def calc_similarity(base_path, keyword1, indices1, keyword2, indices2):
+    intra_average_similarity1, intra_similarities1 = get_intra_similarity(base_path, keyword1, indices1)
+    intra_average_similarity2, intra_similarities2 = get_intra_similarity(base_path, keyword2, indices2)
+    inter_average_similarity, inter_similarities = get_inter_similarity(base_path, keyword1, keyword2, indices1, indices2)
 
-    return result1, result2, result_12, average_score1, average_score2, average_score12
+    return intra_similarities1, intra_similarities2, inter_similarities, intra_average_similarity1, intra_average_similarity2, inter_average_similarity
